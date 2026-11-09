@@ -1,3 +1,7 @@
+> Maintenance fork for abhi-k9/nvim-config. See [FORK.md](FORK.md) for the
+> limited patch scope, public APIs, validation, migration and upstream reconciliation.
+> Original upstream documentation and attribution follow.
+
 [![CI](https://github.com/akinsho/bufferline.nvim/actions/workflows/ci.yaml/badge.svg)](https://github.com/akinsho/bufferline.nvim/actions/workflows/ci.yaml)
 
 <h1 align="center">
