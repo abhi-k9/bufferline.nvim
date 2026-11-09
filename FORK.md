@@ -55,10 +55,12 @@ See `:help bufferline-pinning`, `:help bufferline.is_pinned()`,
   to upstream with the adapter removals: restore the old config integration too.
   Back up sessions before adoption, since upstream cannot decode the new pin format.
 
-The prepared config changes live on a separate local integration branch based on
-`c287c4e` (including `e09c9a6`). They are not activated in the production checkout.
-Publishing the fork commits and adopting the config branch require separate explicit
-authorization. No PR, push, force-push or publication was performed.
+The config integration, based on `c287c4e` (including `e09c9a6`), was published
+and adopted after explicit authorization on 2026-11-09. Both `main` branches
+were fast-forwarded: this fork to `4e964066ed10eb61f7b42b634f9b0877047eccdd`
+and nvim-config to `6d5a6dba83650e7663b70195758003ab1e05b77f`. The config pins
+that published fork revision. No force-push or PR was used. The verification
+below records the checks performed before publication.
 
 ## Verification (2026-11-09)
 
