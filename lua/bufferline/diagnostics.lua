@@ -22,6 +22,12 @@ setmetatable(severity_name, {
 
 local last_diagnostics_result = {}
 
+function M.setup()
+  last_diagnostics_result = {}
+  local cache = package.loaded["bufferline.diagnostic_cache"]
+  if cache then cache.reset() end
+end
+
 local function get_err_dict(errs)
   local ds = {}
   local max = #severity_name
@@ -146,7 +152,14 @@ function M.get(opts)
   if is_disabled(opts.diagnostics) then return setmetatable({}, mt) end
   local update_nvim = opts.diagnostics == "nvim_lsp" and vim.diagnostic.config().update_in_insert
   local update_coc = opts.diagnostics == "coc" and opts.diagnostics_update_in_insert
-  if is_insert() and not update_nvim and not update_coc then return setmetatable(last_diagnostics_result, mt) end
+  if is_insert() and not update_nvim and not update_coc then
+    return setmetatable(last_diagnostics_result[opts.diagnostics] or {}, mt)
+  end
+  if opts.diagnostics == "nvim_lsp" and opts.diagnostics_cache and vim.diagnostic.is_enabled then
+    local result = require("bufferline.diagnostic_cache").get()
+    last_diagnostics_result.nvim_lsp = result
+    return result
+  end
   local diagnostics = get_diagnostics[opts.diagnostics]()
   local result = {}
   for buf_num, items in pairs(diagnostics) do
@@ -157,7 +170,7 @@ function M.get(opts)
       errors = d.errors,
     }
   end
-  last_diagnostics_result = result
+  last_diagnostics_result[opts.diagnostics] = result
   return setmetatable(result, mt)
 end
 

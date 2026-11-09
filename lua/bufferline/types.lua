@@ -60,6 +60,7 @@
 ---@field public max_prefix_length? number
 ---@field public sort_by? 'insert_after_current' | 'insert_at_end' | 'id' | 'extension' | 'relative_directory' | 'directory' | 'tabs' | fun(buffer_a: bufferline.Buffer, buffer_b: bufferline.Buffer): boolean
 ---@field public diagnostics? boolean | 'nvim_lsp' | 'coc'
+---@field public diagnostics_cache? boolean
 ---@field public diagnostics_indicator? bufferline.DiagnosticIndicator
 ---@field public diagnostics_update_in_insert? boolean
 ---@field public diagnostics_update_on_event? boolean

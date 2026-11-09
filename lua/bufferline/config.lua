@@ -667,6 +667,7 @@ local function get_defaults()
     max_prefix_length = 15,
     sort_by = "id",
     diagnostics = false,
+    diagnostics_cache = false,
     diagnostics_indicator = nil,
     diagnostics_update_in_insert = true,
     diagnostics_update_on_event = true,

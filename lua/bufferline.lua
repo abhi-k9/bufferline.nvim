@@ -197,6 +197,7 @@ function M.setup(conf)
   config.setup(conf)
   groups.setup(conf) -- Groups must be set up before the config is applied
   local preferences = config.apply()
+  require("bufferline.diagnostics").setup()
   -- on loading (and reloading) the plugin's config reset all the highlights
   highlights.set_all(preferences)
   hover.setup(preferences)

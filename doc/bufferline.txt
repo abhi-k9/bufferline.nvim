@@ -102,6 +102,7 @@ The available configuration are:
             diagnostics = false | "nvim_lsp" | "coc",
             diagnostics_update_in_insert = false, -- only applies to coc
             diagnostics_update_on_event = true, -- use nvim's diagnostic handler
+            diagnostics_cache = false, -- exact nvim_lsp counts, opt-in
             -- The diagnostics indicator can be set to nil to keep the buffer name highlight but delete the highlighting
             diagnostics_indicator = function(count, level, diagnostics_dict, context)
                 return "("..count..")"
@@ -307,6 +308,23 @@ tell at a glance if a particular buffer has errors. Currently only the
 native neovim lsp is supported, mainly because it has the easiest API for
 fetching all errors for all buffers (with an attached lsp client) This
 feature is _WIP_ so beware and report any issues if you find any.
+
+                                              *bufferline-diagnostics-cache*
+With `diagnostics = "nvim_lsp"`, set `diagnostics_cache = true` to reuse exact
+per-buffer, per-namespace severity counts between redraws (Neovim >= 0.10).
+It defaults to false; older Neovim versions use the original getter. This is
+the supported replacement for config-level diagnostic getter overrides.
+
+The cache seeds from all diagnostics, coalesces DiagnosticChanged events by
+buffer, and removes wiped buffers. Every read checks namespace/buffer enable
+state, including global disable, without relying on DiagnosticChanged for
+enable/disable notifications. Error, warning, info and hint totals remain
+exact regardless of diagnostic volume; no sampling or count limit is used.
+Insert/replace updates follow `vim.diagnostic.config().update_in_insert`.
+CoC retains its own provider and `diagnostics_update_in_insert` policy.
+Calling `require('bufferline').setup()` resets cached results and event ownership.
+The cache does not replace any Neovim diagnostic API. Returned summaries are
+read-only; indicators must not mutate the diagnostics_dict argument.
 
 In order to customise the appearance of the diagnostic count you can pass
 a custom function in your setup.
