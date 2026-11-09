@@ -1,71 +1,48 @@
 name: CI
 on:
   push:
-    #   paths-ignore:
-    #     - ".github/**"
-    #     - "*.md"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   format:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v3
-      - uses: JohnnyMorganz/stylua-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          version: latest
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --config-path=stylua.toml lua/
-      - name: Commit files
-        run: |
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          if ! [[ -z $(git status -s) ]]; then
-            git commit -m "chore: formatting" lua/*
-          fi
-      - name: Push changes
-        uses: ad-m/github-push-action@master
+          persist-credentials: false
+      - uses: JohnnyMorganz/stylua-action@479972f01e665acfcba96ada452c36608bdbbb5e # v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.ref }}
+          version: v2.3.1
+          args: --check --config-path=stylua.toml lua/ tests/
 
   tests:
-    name: Tests
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        neovim: [v0.12.0, v0.12.6]
     steps:
-      - uses: actions/checkout@v3
-      - name: Install Neovim
-        shell: bash
-        run: |
-          mkdir -p /tmp/nvim
-          wget -q https://github.com/neovim/neovim/releases/download/nightly/nvim.appimage -O /tmp/nvim/nvim.appimage
-          cd /tmp/nvim
-          chmod a+x ./nvim.appimage
-          ./nvim.appimage --appimage-extract
-          echo "/tmp/nvim/squashfs-root/usr/bin/" >> $GITHUB_PATH
-
-      - name: Run tests
-        run: |
-          nvim --version
-          [ ! -d tests ] && exit 0
-          nvim --headless -u tests/minimal_init.lua -c "PlenaryBustedDirectory tests/ {minimal_init = 'tests/minimal_init.lua', sequential = true}"
-
-  release:
-    name: release
-    if: ${{ github.ref == 'refs/heads/main' }}
-    needs:
-      - tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: google-github-actions/release-please-action@v3
-        id: release
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          release-type: simple
-          package-name: bufferline.nvim
-      - uses: actions/checkout@v3
-      - name: tag stable versions
-        if: ${{ steps.release.outputs.release_created }}
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email github-actions[bot]@users.noreply.github.com
-          git remote add gh-token "https://${{ secrets.GITHUB_TOKEN }}@github.com/google-github-actions/release-please-action.git"
+          persist-credentials: false
+      - uses: rhysd/action-setup-vim@febef33995d6649302e9d88dda81e071b68f16a7 # v1
+        with:
+          neovim: true
+          version: ${{ matrix.neovim }}
+      - name: Install pinned test dependencies
+        timeout-minutes: 3
+        run: bash scripts/bootstrap-tests.sh
+      - name: Run upstream suite and focused regressions
+        timeout-minutes: 3
+        run: bash scripts/test.sh

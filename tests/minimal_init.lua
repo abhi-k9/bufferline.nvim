@@ -9,23 +9,16 @@ end
 function M.load(plugin)
   local name = plugin:match(".*/(.*)")
   local package_root = M.root(".tests/site/pack/deps/start/")
-  if not vim.loop.fs_stat(package_root .. name) then
-    print("Installing " .. plugin)
-    vim.fn.mkdir(package_root, "p")
-    vim.fn.system({
-      "git",
-      "clone",
-      "--depth=1",
-      "https://github.com/" .. plugin .. ".git",
-      package_root .. "/" .. name,
-    })
-  end
+  assert(
+    (vim.uv or vim.loop).fs_stat(package_root .. name),
+    "Run bash scripts/bootstrap-tests.sh first: missing " .. plugin
+  )
 end
 
 function M.setup()
   vim.cmd([[set runtimepath=$VIMRUNTIME]])
   vim.opt.runtimepath:append(M.root())
-  vim.opt.packpath = { M.root(".tests/site") }
+  vim.opt.packpath = { M.root(".tests/site"), vim.env.VIMRUNTIME }
   M.load("nvim-lua/plenary.nvim")
   M.load("nvim-tree/nvim-web-devicons")
   vim.env.XDG_CONFIG_HOME = M.root(".tests/config")
@@ -35,6 +28,7 @@ function M.setup()
 end
 
 vim.o.swapfile = false
+vim.o.shadafile = "NONE"
 _G.__TEST = true
 
 M.setup()
