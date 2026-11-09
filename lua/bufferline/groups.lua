@@ -18,6 +18,7 @@ local PINNED_NAME = "pinned"
 local UNGROUPED_NAME = "ungrouped"
 local UNGROUPED_ID = "ungrouped"
 local PINNED_KEY = "BufferlinePinnedBuffers"
+local PINNED_FORMAT = "bufferline-pins-v1:"
 
 local api = vim.api
 local fmt = string.format
@@ -145,19 +146,19 @@ local group_state = {
   components_by_group = {},
 }
 
---- Store a list of pinned buffer as a string of ids e.g. "12,10,5"
---- in a vim.g global variable that can be persisted across vim sessions
-local function persist_pinned_buffers()
+--- Store a versioned JSON list in a session-persistable string global.
+local function persist_pinned_buffers(restoring)
+  -- Buffer events during :source must not overwrite the incoming session data.
+  if vim.g.SessionLoad and not restoring then return end
   local pinned = {}
   for buf, group in pairs(group_state.manual_groupings) do
-    if group == PINNED_ID then table.insert(pinned, api.nvim_buf_get_name(buf)) end
+    if group == PINNED_ID and api.nvim_buf_is_valid(buf) then
+      local name = api.nvim_buf_get_name(buf)
+      if name ~= "" then table.insert(pinned, name) end
+    end
   end
-
-  if #pinned == 0 then
-    vim.g[PINNED_KEY] = ""
-  else
-    vim.g[PINNED_KEY] = table.concat(pinned, ",")
-  end
+  table.sort(pinned)
+  vim.g[PINNED_KEY] = PINNED_FORMAT .. vim.json.encode(pinned)
 end
 
 ---@param element bufferline.TabElement
@@ -239,19 +240,48 @@ function M.component(ctx)
   }
 end
 
---- Pull pinned buffers saved in a vim.g global variable and restore them
---- to the manual_groupings table.
-local function restore_pinned_buffers()
-  local pinned = vim.g[PINNED_KEY]
-  if not pinned then return end
-  local manual_groupings = vim.split(pinned, ",") or {}
-  for _, path in ipairs(manual_groupings) do
-    local buf_id = fn.bufnr(path --[[@as integer]])
-    if buf_id ~= -1 then
-      set_manual_group(buf_id, PINNED_ID)
-      persist_pinned_buffers()
-    end
+local function saved_pins(value)
+  if value == nil or value == "" then return {} end
+  if type(value) ~= "string" then return nil end
+  local names
+  if value:sub(1, #PINNED_FORMAT) == PINNED_FORMAT then
+    local ok, decoded = pcall(vim.json.decode, value:sub(#PINNED_FORMAT + 1))
+    if not ok or type(decoded) ~= "table" or not utils.is_list(decoded) then return nil end
+    names = decoded
+  elseif value:find("^bufferline%-pins%-") or value:find(",", 1, true) then
+    -- Legacy CSV cannot distinguish separators from commas in filenames.
+    -- Never guess: a fragment may be the name of a different open buffer.
+    return nil
+  else
+    names = { value } -- unambiguous, single-file legacy session
   end
+  for _, name in ipairs(names) do
+    if type(name) ~= "string" or name == "" or name:find("%z") then return nil end
+  end
+  return names
+end
+
+--- Replace only pin memberships, using literal names of existing buffers.
+local function restore_pinned_buffers()
+  local names = saved_pins(vim.g[PINNED_KEY])
+  local by_name = {}
+  for _, id in ipairs(api.nvim_list_bufs()) do
+    by_name[api.nvim_buf_get_name(id)] = id
+  end
+  for id, group in pairs(group_state.manual_groupings) do
+    if group == PINNED_ID then set_manual_group(id, nil) end
+  end
+  for _, name in ipairs(names or {}) do
+    local id = by_name[name]
+    if id then set_manual_group(id, PINNED_ID) end
+  end
+  if not names then
+    utils.notify(
+      "Saved pins are invalid or ambiguous legacy CSV; please pin the buffers again and save the session.",
+      "warn"
+    )
+  end
+  persist_pinned_buffers(true)
   ui.refresh()
 end
 
@@ -279,8 +309,28 @@ function M.setup(conf)
       priority = vim.tbl_count(group_state.user_groups) + 1,
     })
   end
-  -- Restore pinned buffer from the previous session
-  api.nvim_create_autocmd("SessionLoadPost", { once = true, callback = restore_pinned_buffers })
+  local group = api.nvim_create_augroup("BufferlinePins", { clear = true })
+  -- Neovim 0.12 session files emit this before restoring globals. A session
+  -- without pin metadata must not inherit the previous session's global.
+  if fn.exists("##SessionLoadPre") == 1 then
+    api.nvim_create_autocmd("SessionLoadPre", {
+      group = group,
+      callback = function() vim.g[PINNED_KEY] = nil end,
+    })
+  end
+  api.nvim_create_autocmd("SessionLoadPost", { group = group, callback = restore_pinned_buffers })
+  api.nvim_create_autocmd("BufWipeout", {
+    group = group,
+    callback = function(args)
+      local was_pinned = group_state.manual_groupings[args.buf] == PINNED_ID
+      set_manual_group(args.buf, nil)
+      if was_pinned then persist_pinned_buffers() end
+    end,
+  })
+  api.nvim_create_autocmd("BufFilePost", {
+    group = group,
+    callback = function() persist_pinned_buffers() end,
+  })
 end
 
 ---Execute a command on each buffer of a group
@@ -463,10 +513,10 @@ function M.action(name, action)
     command(name, function(b) api.nvim_buf_delete(b.id, { force = true }) end)
     ui.refresh()
 
-    if name == PINNED_NAME then vim.g[PINNED_KEY] = {} end
     for buf, group_id in pairs(group_state.manual_groupings) do
       if group_id == name then group_state.manual_groupings[buf] = nil end
     end
+    if name == PINNED_NAME then persist_pinned_buffers() end
   elseif action == "toggle" then
     M.toggle_hidden(nil, name)
     ui.refresh()

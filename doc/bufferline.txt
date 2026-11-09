@@ -433,6 +433,22 @@ Buffers can be pinned to the start of the bufferline by using the
 `:BufferLineTogglePin` command, this will override other groupings or sorting
 order for the buffer and position it left of all other buffers.
 
+With `sessionoptions+=globals`, pins are saved as a versioned JSON list in
+`g:BufferlinePinnedBuffers`. Restoring a session replaces the previous pins by
+exact filename; missing buffers are skipped and other group memberships are
+left alone. Restoration does not create buffers or change their listed state.
+Unnamed buffers can be pinned during use but cannot be persisted by filename.
+
+Single-filename legacy sessions are supported. Old comma-separated records
+are ambiguous (commas may belong to filenames) and are rejected with a warning;
+pin those buffers again and save the session to migrate. Invalid metadata
+clears previous pins rather than restoring a partial or guessed set.
+
+Neovim 0.12 session files emit SessionLoadPre, allowing sessions without saved
+pin metadata to clear the previous session's global. For older session scripts
+or custom loaders which omit that event, emit SessionLoadPre *before* restoring
+globals and SessionLoadPost afterwards. Re-save old scripts with Neovim 0.12.
+
 Pinned buffers are essentially a builtin group that positions the assigned
 elements. The icons and highlights for pinned buffers can be changed similarly
 to other groups e.g.
