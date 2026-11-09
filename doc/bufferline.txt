@@ -475,6 +475,16 @@ in another scope.nvim tab. It does not change focus, ordering or buffer state.
 `require('bufferline.groups').is_pinned(bufnr)` is the equivalent group API.
 Use these APIs instead of the internal `_is_pinned(element)` helper.
 
+                                                        *bufferline.restore_pins()*
+`require('bufferline').restore_pins()` re-applies the validated saved pin names
+to existing buffers. Most session loaders need no explicit call: Bufferline
+does this on every SessionLoadPost. A loader which recreates hidden buffers
+later (such as a scope.nvim post-restore hook) should call it once after those
+buffers exist. Valid missing names remain in the session global for this
+purpose; opening a file alone does not automatically pin it. A pin edit or
+buffer rename/wipe records the current live pins. Call this hook before user
+interaction, because it replaces current pin memberships with saved ones.
+
 Pinned buffers are essentially a builtin group that positions the assigned
 elements. The icons and highlights for pinned buffers can be changed similarly
 to other groups e.g.

@@ -147,9 +147,9 @@ local group_state = {
 }
 
 --- Store a versioned JSON list in a session-persistable string global.
-local function persist_pinned_buffers(restoring)
+local function persist_pinned_buffers()
   -- Buffer events during :source must not overwrite the incoming session data.
-  if vim.g.SessionLoad and not restoring then return end
+  if vim.g.SessionLoad then return end
   local pinned = {}
   for buf, group in pairs(group_state.manual_groupings) do
     if group == PINNED_ID and api.nvim_buf_is_valid(buf) then
@@ -262,7 +262,7 @@ local function saved_pins(value)
 end
 
 --- Replace only pin memberships, using literal names of existing buffers.
-local function restore_pinned_buffers()
+function M.restore_pins()
   local names = saved_pins(vim.g[PINNED_KEY])
   local by_name = {}
   for _, id in ipairs(api.nvim_list_bufs()) do
@@ -281,7 +281,9 @@ local function restore_pinned_buffers()
       "warn"
     )
   end
-  persist_pinned_buffers(true)
+  -- Keep valid missing names for staged loaders (e.g. scope restores hidden
+  -- buffers after SessionLoadPost). A later explicit restore can resolve them.
+  vim.g[PINNED_KEY] = PINNED_FORMAT .. vim.json.encode(names or {})
   ui.refresh()
 end
 
@@ -318,7 +320,7 @@ function M.setup(conf)
       callback = function() vim.g[PINNED_KEY] = nil end,
     })
   end
-  api.nvim_create_autocmd("SessionLoadPost", { group = group, callback = restore_pinned_buffers })
+  api.nvim_create_autocmd("SessionLoadPost", { group = group, callback = M.restore_pins })
   api.nvim_create_autocmd("BufWipeout", {
     group = group,
     callback = function(args)
@@ -329,7 +331,9 @@ function M.setup(conf)
   })
   api.nvim_create_autocmd("BufFilePost", {
     group = group,
-    callback = function() persist_pinned_buffers() end,
+    callback = function(args)
+      if group_state.manual_groupings[args.buf] == PINNED_ID then persist_pinned_buffers() end
+    end,
   })
 end
 

@@ -30,6 +30,7 @@ local M = {
   pick = commands.pick,
   get_elements = commands.get_elements,
   is_pinned = groups.is_pinned,
+  restore_pins = groups.restore_pins,
   close_with_pick = commands.close_with_pick,
   close_in_direction = commands.close_in_direction,
   rename_tab = commands.rename_tab,
