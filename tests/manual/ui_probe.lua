@@ -24,7 +24,7 @@ require("catppuccin").setup({})
 vim.cmd.colorscheme("catppuccin-mocha")
 local spec
 for _, item in ipairs(dofile(config_root .. "/lua/plugins/ui.lua")) do
-  if item[1] == "akinsho/bufferline.nvim" then spec = item end
+  if item[1] == "akinsho/bufferline.nvim" or item[1] == "abhi-k9/bufferline.nvim" then spec = item end
 end
 local line, groups = require("bufferline"), require("bufferline.groups")
 local opts = spec.opts()
@@ -65,13 +65,24 @@ if phase == "save" then
   require("config.session").save_scopes()
   vim.o.sessionoptions = "buffers,globals,tabpages,winsize"
   vim.cmd.mksession({ vim.env.BUFFERLINE_PROBE_DIR .. "/session.vim", bang = true })
+  groups.remove_element("pinned", { id = hidden })
+  pin(b)
+  vim.cmd.mksession({ vim.env.BUFFERLINE_PROBE_DIR .. "/session-b.vim", bang = true })
   return { phase = phase, pins = vim.g.BufferlinePinnedBuffers }
 elseif phase == "restore" then
-  vim.cmd.source(vim.env.BUFFERLINE_PROBE_DIR .. "/session.vim")
-  require("config.session").restore_scopes()
-  line.restore_pins()
-  local hidden = assert(find("hidden,pin.lua"), "scope did not recreate the hidden buffer")
-  assert(line.is_pinned(hidden), "hidden scope pin was lost before scope restored its buffer")
+  local hidden
+  for _, filename in ipairs({ "session.vim", "session-b.vim", "session.vim" }) do
+    vim.cmd.source(vim.env.BUFFERLINE_PROBE_DIR .. "/" .. filename)
+    for _, hook in ipairs(dofile(config_root .. "/lua/plugins/session.lua").opts.post_restore_cmds) do
+      hook()
+    end
+    hidden = assert(find("hidden,pin.lua"), "scope did not recreate the hidden buffer")
+    assert(line.is_pinned(hidden) == (filename == "session.vim"), "hidden scope pin did not follow session")
+    assert(
+      line.is_pinned(assert(find("beta.lua"))) == (filename == "session-b.vim"),
+      "stale pin survived session switch"
+    )
+  end
   assert(not vim.bo[hidden].buflisted, "hidden scope buffer became listed")
   api.nvim_set_current_tabpage(api.nvim_list_tabpages()[1])
   assert(names()[1]:find("hidden,pin.lua", 1, true), "hidden pin did not sort first")
@@ -165,7 +176,7 @@ function _G.finish_bufferline_ui_probe()
   settings.configure({ ui = { icons = false } })
   package.loaded["config.icons"] = nil
   for _, item in ipairs(dofile(config_root .. "/lua/plugins/ui.lua")) do
-    if item[1] == "akinsho/bufferline.nvim" then spec = item end
+    if item[1] == "akinsho/bufferline.nvim" or item[1] == "abhi-k9/bufferline.nvim" then spec = item end
   end
   opts = spec.opts()
   opts.options.diagnostics_cache = true
