@@ -358,6 +358,15 @@ end
 local group_by_name = group_by("name")
 local group_by_priority = group_by("priority")
 
+--- Whether a valid buffer is pinned, independently of rendering or tab scope.
+---@param bufnr integer Buffer handle; 0 means the current buffer.
+---@return boolean
+function M.is_pinned(bufnr)
+  if type(bufnr) ~= "number" or bufnr < 0 or bufnr % 1 ~= 0 then return false end
+  if bufnr == 0 then bufnr = api.nvim_get_current_buf() end
+  return api.nvim_buf_is_valid(bufnr) and group_state.manual_groupings[bufnr] == PINNED_ID
+end
+
 ---@param element bufferline.TabElement
 function M._is_pinned(element) return get_manual_group(element) == PINNED_ID end
 

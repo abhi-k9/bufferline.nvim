@@ -449,6 +449,14 @@ pin metadata to clear the previous session's global. For older session scripts
 or custom loaders which omit that event, emit SessionLoadPre *before* restoring
 globals and SessionLoadPost afterwards. Re-save old scripts with Neovim 0.12.
 
+                                                           *bufferline.is_pinned()*
+`require('bufferline').is_pinned(bufnr)` returns a boolean indicating whether
+the buffer is pinned. 0 denotes the current buffer; invalid/deleted handles
+return false. This query works before a redraw, including for unlisted buffers
+in another scope.nvim tab. It does not change focus, ordering or buffer state.
+`require('bufferline.groups').is_pinned(bufnr)` is the equivalent group API.
+Use these APIs instead of the internal `_is_pinned(element)` helper.
+
 Pinned buffers are essentially a builtin group that positions the assigned
 elements. The icons and highlights for pinned buffers can be changed similarly
 to other groups e.g.
